@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, iter::FromIterator};
+use std::collections::HashMap;
+use std::iter::{self, FromIterator};
 use worker::{Date, Env, Headers, Request, Response, Result, Router};
 
 #[worker::event(fetch)]
@@ -77,7 +78,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                 ),
             }
 
-            match hitmaps.put(id, hitmap) {
+            match hitmaps.put(id, &hitmap) {
                 Ok(put) => {
                     if let Err(err) = put.execute().await {
                         worker::console_error!(
@@ -96,11 +97,26 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                 ),
             }
 
-            Response::ok(include_str!("../assets/world.svg")).map(|res| {
-                res.with_headers(Headers::from_iter(
-                    [("content-type", "image/svg+xml")].iter(),
-                ))
-            })
+            let total: isize = hitmap.values().sum();
+            let style: String = hitmap
+                .iter()
+                .map(|(key, val)| {
+                    format!(
+                        ".{} {{ fill: #b9{:02x}b9; }}\n",
+                        key.to_lowercase(),
+                        0xb9 - val * 0xb9 / total
+                    )
+                })
+                .chain(iter::once(String::from("</style>")))
+                .collect();
+
+            Response::ok(include_str!("../assets/world.svg").replace("</style>", &style)).map(
+                |res| {
+                    res.with_headers(Headers::from_iter(
+                        [("content-type", "image/svg+xml")].iter(),
+                    ))
+                },
+            )
         })
         .run(req, env)
         .await
