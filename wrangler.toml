@@ -1,6 +1,7 @@
 name = "hitmap"
 type = "javascript"
 compatibility_date = "2022-09-04"
+workers_dev = true
 
 [[kv_namespaces]]
 binding = "hitmaps"
