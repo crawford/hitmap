@@ -83,7 +83,7 @@ pub async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
                 .chain(iter::once(String::from("</style>")))
                 .collect();
 
-            Response::ok(include_str!("../assets/world.svg").replace("</style>", &style)).map(
+            Response::ok(include_str!("../assets/world.svg").replacen("</style>", &style, 1)).map(
                 |res| {
                     res.with_headers(Headers::from_iter(
                         [("content-type", "image/svg+xml")].iter(),
