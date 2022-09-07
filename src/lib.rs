@@ -15,23 +15,21 @@
 
 use std::collections::HashMap;
 use std::iter::{self, FromIterator};
-use worker::{Date, Env, Headers, Request, Response, Result, Router};
+use worker::{Context, Env, Headers, Request, Response, Result, Router};
 
 #[worker::event(fetch)]
-pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Response> {
+pub async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     #[cfg(feature = "panic")]
     console_error_panic_hook::set_once();
+
+    worker_logger::init_with_env(&env, "LOG")?;
 
     Router::new()
         .get_async("/world/:id", |req, ctx| async move {
             let id = match ctx.param("id") {
                 Some(id) => id,
                 None => {
-                    worker::console_debug!(
-                        "{} - [{}]: missing map identifier",
-                        Date::now().to_string(),
-                        req.path()
-                    );
+                    log::debug!("missing map identifier");
                     return Response::error("Bad Request", 400);
                 }
             };
@@ -39,12 +37,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
             let hitmaps = match ctx.kv("hitmaps") {
                 Ok(kv) => kv,
                 Err(err) => {
-                    worker::console_error!(
-                        "{} - [{}]: failed to lookup kv ({})",
-                        Date::now().to_string(),
-                        req.path(),
-                        err
-                    );
+                    log::error!("failed to lookup kv ({})", err);
                     return Response::error("Internal Server Error", 500);
                 }
             };
@@ -53,12 +46,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                 Ok(Some(hitmap)) => hitmap,
                 Ok(None) => HashMap::new(),
                 Err(err) => {
-                    worker::console_error!(
-                        "{} - [{}]: failed to get hitmap ({})",
-                        Date::now().to_string(),
-                        req.path(),
-                        err
-                    );
+                    log::error!("failed to get hitmap ({})", err);
                     return Response::error("Internal Server Error", 500);
                 }
             };
@@ -70,31 +58,16 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
                         .and_modify(|count| *count += 1)
                         .or_insert(1);
                 }
-
-                None => worker::console_warn!(
-                    "{} - [{}]: unknown country of request",
-                    Date::now().to_string(),
-                    req.path()
-                ),
+                None => log::warn!("unknown country of request"),
             }
 
             match hitmaps.put(id, &hitmap) {
                 Ok(put) => {
                     if let Err(err) = put.execute().await {
-                        worker::console_error!(
-                            "{} - [{}]: failed to execute put ({})",
-                            Date::now().to_string(),
-                            req.path(),
-                            err
-                        );
+                        log::error!("[{}] - failed to execute put ({})", req.path(), err);
                     }
                 }
-                Err(err) => worker::console_error!(
-                    "{} - [{}]: failed to put ({})",
-                    Date::now().to_string(),
-                    req.path(),
-                    err
-                ),
+                Err(err) => log::error!("[{}] - failed to put ({})", req.path(), err),
             }
 
             let total: isize = hitmap.values().sum();

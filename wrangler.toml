@@ -7,6 +7,9 @@ binding = "hitmaps"
 id = "ba1e0740a8f64f60be6578643d1d013c"
 preview_id = "d5e287a6482542208ad85ca6718c0cda"
 
+[vars]
+LOG = "debug"
+
 [build]
 command = "cargo install -q worker-build && worker-build --release"
 
